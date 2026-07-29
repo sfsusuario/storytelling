@@ -1,0 +1,24 @@
+[project]
+name = "escalator"
+version = "0.1.0"
+description = "Escalating-sophistication video generator: portrait + phrase -> multi-scene styled video"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.100",
+    "google-genai>=1.20",
+    "edge-tts>=7.0",
+]
+
+[project.optional-dependencies]
+ui = ["gradio>=5.0"]
+
+[project.scripts]
+escalate = "escalator.cli:main"
+escalate-ui = "escalator.ui:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
