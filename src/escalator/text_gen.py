@@ -183,6 +183,9 @@ def generate_rewrites(phrase: str, personas: list[Persona], model: str,
         raise TextGenError(
             f"Expected rewrites for stages 1..{len(personas)}, got {sorted(by_stage)}")
     rewrites = [by_stage[i] for i in range(1, len(personas) + 1)]
+    if personas[0].level <= 1:
+        # Level 1 is reality: the exact original phrase, never a rewrite.
+        rewrites[0] = phrase.strip()
     social = _format_social(result.caption, result.hashtags)
 
     cache_dir.mkdir(parents=True, exist_ok=True)

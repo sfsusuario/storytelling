@@ -35,6 +35,56 @@ def _language_choices() -> list[str]:
     return [f"{code} — {name}" for code, name in LANGUAGE_NAMES.items()]
 
 
+def _history_runs() -> list[tuple[str, str]]:
+    """(label, video_path) for every finished run under output/, newest first."""
+    import json
+    from datetime import datetime
+
+    runs = []
+    for video in Path("output").glob("*/final.mp4"):
+        label = video.parent.name
+        try:
+            manifest = json.loads(
+                (video.parent / "pipeline.json").read_text(encoding="utf-8"))
+            when = datetime.fromtimestamp(video.stat().st_mtime)
+            label = (f'{when:%d/%m %H:%M} — "{manifest.get("Input_Phrase", "?")}" '
+                     f'({manifest.get("Style_Set", "?")}'
+                     f'{", prueba" if manifest.get("Test_Mode") else ""})'
+                     f' [{video.parent.name}]')
+        except (OSError, json.JSONDecodeError):
+            pass
+        runs.append((video.stat().st_mtime, label, str(video)))
+    runs.sort(reverse=True)
+    return [(label, path) for _, label, path in runs]
+
+
+def _load_history_run(video_path: str | None):
+    import json
+
+    if not video_path:
+        return None, ""
+    run_dir = Path(video_path).parent
+    details = [f"Carpeta: {run_dir.resolve()}"]
+    try:
+        m = json.loads((run_dir / "pipeline.json").read_text(encoding="utf-8"))
+        details = [
+            f'Frase:     "{m.get("Input_Phrase")}"',
+            f"Set:       {m.get('Style_Set')}   Idioma: {m.get('Language')}   "
+            f"Duración: {m.get('Total_Duration')}s",
+            f"Voz:       {m.get('Scenes', [{}])[0].get('Voice_Config', {}).get('voice', '?')}",
+            "Escenas:   " + " | ".join(
+                f"N{s.get('Style_Level')} {s.get('Style')}"
+                for s in m.get("Scenes", [])),
+            f"Carpeta:   {run_dir.resolve()}",
+        ]
+    except (OSError, json.JSONDecodeError):
+        pass
+    social_file = run_dir / "social.txt"
+    if social_file.exists():
+        details.append("\n" + social_file.read_text(encoding="utf-8"))
+    return video_path, "\n".join(details)
+
+
 def build_app():
     import gradio as gr
 
@@ -228,12 +278,34 @@ def build_app():
                     log = gr.Textbox(show_label=False, lines=10, max_lines=14,
                                      interactive=False)
 
+        with gr.Accordion("📼 Historial de videos generados", open=False):
+            with gr.Row():
+                hist_runs = gr.Dropdown(choices=[], label="Ejecuciones",
+                                        scale=4,
+                                        info="Los videos ya generados en "
+                                             "output/; elige uno para verlo")
+                hist_refresh = gr.Button("🔄 Actualizar", scale=1)
+            with gr.Row():
+                hist_video = gr.Video(label="Reproducción", height=480,
+                                      scale=6)
+                hist_info = gr.Textbox(label="Detalles y texto para redes",
+                                       lines=14, interactive=False, scale=6)
+
+        def _refresh_history():
+            return gr.Dropdown(choices=_history_runs())
+
+        hist_refresh.click(_refresh_history, outputs=hist_runs)
+        hist_runs.change(_load_history_run, inputs=hist_runs,
+                         outputs=[hist_video, hist_info])
+        demo.load(_refresh_history, outputs=hist_runs)
+
         go.click(generate,
                  inputs=[image, phrase, style_set, stages, language, voice,
                          seed, test_mode, subtitles, watermark, text_provider,
                          fit, resolution, fps, voice_rate, voice_pitch,
                          text_model, image_model, force, output_dir],
-                 outputs=[log, video, summary, social])
+                 outputs=[log, video, summary, social]).then(
+            _refresh_history, outputs=hist_runs)
     return demo
 
 

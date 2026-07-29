@@ -125,6 +125,15 @@ def generate_scene_images(scenes: list[Scene], base_image: Path, model: str,
     pending = []
     for scene in scenes:
         out = images_dir / f"{scene.scene_id}.png"
+        if scene.persona.level <= 1:
+            # Level 1 is always the untouched original photo: the video opens
+            # with reality, then escalates.
+            scene.visual_style_prompt = "[original photo, no generation]"
+            if not (out.exists() and out.stat().st_size > 0):
+                out.write_bytes(base_image.read_bytes())
+            scene.image_path = out
+            log(f"  image: {out.name} (original, level 1)")
+            continue
         scene.visual_style_prompt = build_image_prompt(scene.persona)
         if out.exists() and out.stat().st_size > 0:
             log(f"  image: {out.name} (cached)")

@@ -88,6 +88,14 @@ Use it to check rewrites, voices, timing and transitions before a real run.
 social-media look) or `--fit pad` (black bars). Use `--resolution 1920x1080`
 for landscape output.
 
+**Scene images**: level 1 is always your untouched original photo **and** the
+exact original phrase, verbatim — the video opens with reality and escalates
+from there. Higher levels are generated with
+Gemini preserving the person's identity, pose, action and centered framing;
+only wardrobe and surroundings transform into each level's world. The UI also
+keeps a **history**: every generated video under `output/` is listed in the
+"📼 Historial" section, playable in place with its details and social caption.
+
 **Spanish by default**: rewrites and narration come out in Spanish
 (`--language es`), translated from the phrase if needed — switch with
 `--language en|pt|fr|...`. The default narrator is an elderly-sounding male

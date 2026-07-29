@@ -290,6 +290,8 @@ STYLE_SETS: dict[str, list[Persona]] = {
 REWRITE_SYSTEM_TEMPLATE = """\
 You rewrite a short phrase into escalating registers for a social-media video.
 Rules:
+- Stage 1 IS the original phrase, verbatim — do not rewrite, translate or
+  clean it up; return it exactly as given.
 - Preserve the core meaning and intent of the original phrase exactly.
 - Each rewrite must match its persona's tone, vocabulary, and syntactic complexity,
   and sophistication must strictly increase from stage 1 to the last stage.
@@ -323,24 +325,29 @@ Rewrite it once per stage below:
 """
 
 IMAGE_PROMPT_TEMPLATE = """\
-Transform this portrait into: {name} (sophistication level {level} of 5).
+Transform this photo into: {name} (sophistication level {level} of 5).
 
-IDENTITY — non-negotiable: it must be the SAME person. Keep their face, facial \
-structure, eyes, skin tone and recognizable likeness intact; anyone who knows \
-them should recognize them instantly. Render the face with photographic \
-fidelity to the reference photo even when the scene, clothing and background \
-are stylized or painterly — NEVER cartoonify, caricature or redraw the face.
+KEEP EXACTLY AS IN THE REFERENCE PHOTO — non-negotiable:
+- The SAME person: face, facial structure, eyes, skin tone, hair and \
+recognizable likeness, rendered with photographic fidelity — NEVER \
+cartoonify, caricature or redraw the face.
+- Their pose and body position: same posture, same gesture, same action they \
+are performing, same camera angle and distance.
+- The composition: the subject stays centered and framed exactly like the \
+original.
 
-EVERYTHING ELSE — be bold and creative: fully reimagine the wardrobe, props, \
-pose, attitude and expression nuance so they EMBODY this persona; rebuild the \
-background and setting as a rich, detailed world that belongs to this level; \
-use dramatic lighting and an art style true to the persona. The grandeur and \
-production value should feel appropriate to rank {level} of 5 — humble and \
-mundane at low levels, epic and magnificent at high levels.
+CHANGE ONLY — and here be bold and creative:
+- Their clothing, wardrobe and accessories: fully reimagined so the SAME pose \
+and action now belong to this persona.
+- The environment around them: background, setting, props and lighting \
+rebuilt as a rich, detailed world of this level, as if the original scene had \
+been transported to this persona's world.
 
-This level's world: {image_detail}.
+The grandeur should match rank {level} of 5 — humble and mundane at low \
+levels, epic and magnificent at high levels, always influenced by this \
+level's style: {image_detail}.
 
-Vertical portrait composition, subject prominent, cinematic quality.\
+Cinematic quality, coherent light on the subject matching the new scene.\
 """
 
 
