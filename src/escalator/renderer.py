@@ -59,8 +59,13 @@ def _subtitle_filters(scene, clips_dir: Path, duration: float,
     """
     if scene.word_timings:
         filters = []
-        chunks = _chunk_words(scene.word_timings)
+        # Sentence case over the WHOLE narration: only the very first letter
+        # of the first chunk is uppercase; every other word is lowercase.
+        lowered = [{**w, "w": w["w"].lower()} for w in scene.word_timings]
+        chunks = _chunk_words(lowered)
         for i, (text, start, end) in enumerate(chunks):
+            if i == 0 and text:
+                text = text[0].upper() + text[1:]
             path = _sub_textfile(
                 clips_dir, f"{scene.scene_id}.sub{i:02d}.txt",
                 "\n".join(textwrap.wrap(text, width=_CHUNK_MAX_CHARS + 4)))
@@ -75,7 +80,9 @@ def _subtitle_filters(scene, clips_dir: Path, duration: float,
                 f"enable='between(t,{show:.3f},{hide:.3f})',")
         return "".join(filters)
 
-    wrapped = "\n".join(textwrap.wrap(scene.speech_script, width=28))
+    text = scene.speech_script.strip()
+    text = text[0].upper() + text[1:].lower() if text else text
+    wrapped = "\n".join(textwrap.wrap(text, width=28))
     path = _sub_textfile(clips_dir, f"{scene.scene_id}.sub.txt", wrapped)
     end = max(0.5, duration - 0.35)
     return (f"drawtext=textfile='{path}':{_SUB_STYLE}:"
@@ -110,6 +117,7 @@ def render_scene_clip(ffmpeg: str, timeline: Timeline, scene, clips_dir: Path,
     out = clips_dir / f"{scene.scene_id}.mp4"
     meta_file = clips_dir / f"{scene.scene_id}.meta"
     stamp = "|".join(str(x) for x in (
+        "v2-sentencecase",
         scene.speech_script, scene.scene_duration, timeline.fit,
         timeline.watermark, timeline.subtitles, timeline.width,
         timeline.height, timeline.fps, timeline.level_word,

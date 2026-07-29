@@ -270,7 +270,7 @@ def build_app():
                 video = gr.Video(label="Video final", height=560)
                 social = gr.Textbox(
                     label="📣 Descripción y hashtags para TikTok/redes",
-                    lines=4, interactive=False,
+                    lines=4, interactive=False, buttons=["copy"],
                     info="Copia y pega al publicar (también en social.txt)")
                 summary = gr.Textbox(label="Resumen de la ejecución", lines=6,
                                      interactive=False)
@@ -289,7 +289,8 @@ def build_app():
                 hist_video = gr.Video(label="Reproducción", height=480,
                                       scale=6)
                 hist_info = gr.Textbox(label="Detalles y texto para redes",
-                                       lines=14, interactive=False, scale=6)
+                                       lines=14, interactive=False, scale=6,
+                                       buttons=["copy"])
 
         def _refresh_history():
             return gr.Dropdown(choices=_history_runs())
