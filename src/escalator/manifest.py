@@ -10,7 +10,7 @@ from .models import Timeline
 
 def write_manifest(options: PipelineOptions, timeline: Timeline,
                    style_set_label: str, output_dir: Path,
-                   dry_run: bool) -> Path:
+                   dry_run: bool, music_desc: str = "none") -> Path:
     scenes = []
     for s in timeline.scenes:
         rel = lambda p: p.relative_to(output_dir).as_posix() if p else None
@@ -51,6 +51,8 @@ def write_manifest(options: PipelineOptions, timeline: Timeline,
         "Fit": timeline.fit,
         "Watermark": timeline.watermark,
         "Subtitles": timeline.subtitles,
+        "Music": {"source": music_desc, "style_set": style_set_label,
+                  "volume": options.music_volume},
         "Text_Provider": options.text_provider,
         "Text_Model": options.text_model,
         "Image_Model": options.image_model,

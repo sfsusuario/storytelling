@@ -119,6 +119,24 @@ def run_pipeline(options: PipelineOptions,
     for scene, rewrite in zip(scenes, rewrites):
         scene.speech_script = rewrite
         log(f'  L{scene.persona.level} {scene.persona.name}: "{rewrite}"')
+
+    # Resolve the background music. Default is the locally synthesized
+    # ambience: unique audio that copyright detectors (TikTok/YouTube) can
+    # never flag. "track" uses CC-BY tracks instead — legal with the credit
+    # that then rides along in the social text, but automated detection may
+    # still block them on some platforms.
+    music_source = None
+    music_desc = "none"
+    if options.music_volume > 0 and not options.dry_run:
+        if options.music_source == "track":
+            from .music import attribution as music_attribution, music_file
+            music_source = music_file(style_set, log=log)
+            if music_source is not None:
+                music_desc = music_attribution(style_set)
+                social = f"{social}\n\n{music_desc}" if social else music_desc
+        if music_source is None:
+            music_source = config.background_graph(style_set)
+            music_desc = "synthesized ambience (ffmpeg, copyright-free)"
     if social:
         (output_dir / "social.txt").write_text(social, encoding="utf-8")
 
@@ -161,15 +179,17 @@ def run_pipeline(options: PipelineOptions,
                               LEVEL_WORDS.get(options.language, "NIVEL"))
     log(f"[4/5] timeline: {timeline.total_duration:.2f}s total")
 
-    # Stage 5: render
+    # Stage 5: render (with ambient background bed per style set)
     from .renderer import render_all
     log("[5/5] render")
     final_path = render_all(ffmpeg, timeline, output_dir / "04_clips",
                             output_dir / "final.mp4",
-                            reencode=options.reencode_concat, log=log)
+                            reencode=options.reencode_concat,
+                            music_source=music_source,
+                            music_volume=options.music_volume, log=log)
 
     manifest_path = write_manifest(options, timeline, style_set, output_dir,
-                                   dry_run=False)
+                                   dry_run=False, music_desc=music_desc)
     log(f"done: {final_path}")
     return PipelineResult(output_dir, manifest_path, final_path, style_set,
                           personas, social)

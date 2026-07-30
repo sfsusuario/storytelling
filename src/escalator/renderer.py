@@ -215,10 +215,69 @@ def concat_clips(ffmpeg: str, timeline: Timeline, clips_dir: Path,
     return final_path
 
 
+def mix_background_music(ffmpeg: str, video_in: Path,
+                         music_source: str | Path, volume: float,
+                         duration: float, out: Path, log=print) -> Path:
+    """Mix a background bed (music file or lavfi graph) under the narration.
+
+    The video stream is copied untouched; only audio is re-encoded. The bed
+    fades in at the start and out over the last two seconds, and music files
+    loop if shorter than the video.
+    """
+    if isinstance(music_source, Path):
+        # -ss skips quiet track intros; loudnorm below evens out the level.
+        bg_inputs = ["-ss", "6", "-stream_loop", "-1", "-i", str(music_source)]
+    else:
+        bg_inputs = ["-f", "lavfi", "-t", f"{duration:.3f}",
+                     "-i", music_source]
+    fade_out = max(0.0, duration - 2.0)
+    tmp = out.with_suffix(".mix.mp4")
+    run_ffmpeg(ffmpeg, [
+        "-y", "-i", str(video_in), *bg_inputs,
+        "-filter_complex",
+        (f"[1:a]atrim=duration={duration:.3f},"
+         "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=44100,"
+         f"volume={volume:.3f},"
+         f"afade=t=in:d=1.2,afade=t=out:st={fade_out:.3f}:d=2[bg];"
+         "[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0:"
+         "normalize=0[a]"),
+        "-map", "0:v", "-map", "[a]",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart", str(tmp),
+    ])
+    tmp.replace(out)
+    log(f"  music: fondo mezclado (volumen {volume:.2f})")
+    return out
+
+
+def render_music_preview(ffmpeg: str, graph: str, out: Path,
+                         seconds: float = 6.0) -> Path:
+    """Short standalone sample of a soundscape, for quick listening."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_suffix(".tmp.m4a")
+    run_ffmpeg(ffmpeg, [
+        "-y", "-f", "lavfi", "-t", f"{seconds:.1f}", "-i", graph,
+        "-af", "volume=1.6,afade=t=in:d=0.4,"
+               f"afade=t=out:st={seconds - 0.8:.1f}:d=0.8",
+        "-c:a", "aac", "-b:a", "160k", str(tmp),
+    ])
+    tmp.replace(out)
+    return out
+
+
 def render_all(ffmpeg: str, timeline: Timeline, clips_dir: Path,
-               final_path: Path, reencode: bool = False, log=print) -> Path:
+               final_path: Path, reencode: bool = False,
+               music_source: str | Path | None = None,
+               music_volume: float = 0.0, log=print) -> Path:
     clips_dir.mkdir(parents=True, exist_ok=True)
     for scene in timeline.scenes:
         render_scene_clip(ffmpeg, timeline, scene, clips_dir, log=log)
+    if music_source and music_volume > 0:
+        premix = clips_dir / "final_premix.mp4"
+        concat_clips(ffmpeg, timeline, clips_dir, premix,
+                     reencode=reencode, log=lambda *_: None)
+        return mix_background_music(ffmpeg, premix, music_source,
+                                    music_volume, timeline.total_duration,
+                                    final_path, log=log)
     return concat_clips(ffmpeg, timeline, clips_dir, final_path,
                         reencode=reencode, log=log)

@@ -6,15 +6,18 @@ import threading
 from pathlib import Path
 
 from .config import (CURATED_VOICES, DEFAULT_FPS, DEFAULT_HEIGHT,
-                     DEFAULT_IMAGE_MODEL, DEFAULT_LANGUAGE, DEFAULT_STAGES,
-                     DEFAULT_TEXT_MODEL, DEFAULT_VOICE, DEFAULT_VOICE_PITCH,
-                     DEFAULT_VOICE_RATE, DEFAULT_WATERMARK, LANGUAGE_NAMES,
-                     STYLE_SETS, DEFAULT_WIDTH, PipelineOptions)
+                     DEFAULT_IMAGE_MODEL, DEFAULT_LANGUAGE,
+                     DEFAULT_MUSIC_VOLUME, DEFAULT_STAGES, DEFAULT_TEXT_MODEL,
+                     DEFAULT_VOICE, DEFAULT_VOICE_PITCH, DEFAULT_VOICE_RATE,
+                     DEFAULT_WATERMARK, LANGUAGE_NAMES, STYLE_SETS,
+                     DEFAULT_WIDTH, PipelineOptions, background_graph)
 
 _SET_LABELS_ES = {
     "medieval": "medieval", "scifi": "ciencia ficción", "corporate": "corporativo",
     "mythology": "mitología", "military": "militar", "pirate": "piratas",
-    "arcane": "magia arcana",
+    "arcane": "magia arcana", "epochs": "épocas de la historia",
+    "wealth": "escalada de riqueza", "tech": "profesiones tech",
+    "anger": "escalada de enfado",
 }
 
 
@@ -33,6 +36,29 @@ def _style_set_info() -> str:
 
 def _language_choices() -> list[str]:
     return [f"{code} — {name}" for code, name in LANGUAGE_NAMES.items()]
+
+
+def _preview_music(style_set_label: str, source_label: str) -> str:
+    """Return a listenable sample of what the video's background will use."""
+    import tempfile
+
+    set_name = str(style_set_label).split(" ")[0]
+    source = str(source_label).split(" ")[0]
+    if source == "track":
+        from .music import music_file
+
+        track = music_file(set_name, log=lambda *_: None)
+        if track is not None:
+            return str(track)
+
+    from .ffutil import require_ffmpeg
+    from .renderer import render_music_preview
+
+    ffmpeg, _ = require_ffmpeg()
+    out = Path(tempfile.gettempdir()) / f"escalator_ambient_{set_name}.m4a"
+    if not (out.exists() and out.stat().st_size > 0):
+        render_music_preview(ffmpeg, background_graph(set_name), out)
+    return str(out)
 
 
 def _history_runs() -> list[tuple[str, str]]:
@@ -89,9 +115,10 @@ def build_app():
     import gradio as gr
 
     def generate(image_path, phrase, style_set, stages, language, voice,
-                 seed, test_mode, subtitles, watermark, text_provider, fit,
-                 resolution, fps, voice_rate, voice_pitch, text_model,
-                 image_model, force, output_dir):
+                 seed, test_mode, subtitles, music_enabled, music_volume,
+                 music_source, watermark, text_provider, fit, resolution,
+                 fps, voice_rate, voice_pitch, text_model, image_model,
+                 force, output_dir):
         if not image_path:
             raise gr.Error("Sube primero una imagen de retrato.")
         if not phrase or not phrase.strip():
@@ -135,6 +162,8 @@ def build_app():
             fit=str(fit).split(" ")[0],
             watermark=(watermark or "").strip(),
             subtitles=bool(subtitles),
+            music_volume=float(music_volume or 0.0) if music_enabled else 0.0,
+            music_source=str(music_source).split(" ")[0],
             output_dir=Path(output_dir) if output_dir else None,
             test_mode=bool(test_mode),
             text_provider=provider,
@@ -227,6 +256,24 @@ def build_app():
                     subtitles = gr.Checkbox(
                         value=True, label="Subtítulos de la narración",
                         info="Incrusta el texto narrado en cada escena")
+                    music_enabled = gr.Checkbox(
+                        value=True, label="Añadir música de fondo",
+                        info="Mezcla una banda sonora acorde al set bajo la "
+                             "narración")
+                    with gr.Row():
+                        music_volume = gr.Slider(
+                            0.0, 0.6, value=DEFAULT_MUSIC_VOLUME, step=0.01,
+                            label="Volumen de la música", scale=3)
+                        music_btn = gr.Button("🔊 Probar música", scale=1)
+                    music_source = gr.Dropdown(
+                        ["track (pista CC-BY de incompetech)",
+                         "synth (ambiente sintetizado, nunca bloqueado)"],
+                        value="track (pista CC-BY de incompetech)",
+                        label="Fuente de la música",
+                        info="Si TikTok bloquea una pista, cambia a synth o "
+                             "avísame para elegir otra banda sonora")
+                    music_preview = gr.Audio(label="Muestra del ambiente",
+                                             visible=True, interactive=False)
 
                 with gr.Accordion("Avanzado", open=False):
                     text_provider = gr.Dropdown(
@@ -295,6 +342,8 @@ def build_app():
         def _refresh_history():
             return gr.Dropdown(choices=_history_runs())
 
+        music_btn.click(_preview_music, inputs=[style_set, music_source],
+                        outputs=music_preview)
         hist_refresh.click(_refresh_history, outputs=hist_runs)
         hist_runs.change(_load_history_run, inputs=hist_runs,
                          outputs=[hist_video, hist_info])
@@ -302,7 +351,8 @@ def build_app():
 
         go.click(generate,
                  inputs=[image, phrase, style_set, stages, language, voice,
-                         seed, test_mode, subtitles, watermark, text_provider,
+                         seed, test_mode, subtitles, music_enabled,
+                         music_volume, music_source, watermark, text_provider,
                          fit, resolution, fps, voice_rate, voice_pitch,
                          text_model, image_model, force, output_dir],
                  outputs=[log, video, summary, social]).then(
@@ -318,8 +368,11 @@ def main() -> int:
               "  pip install -e .[ui]")
         return 1
     import gradio as gr
+
+    from .music import _cache_dir
     build_app().launch(
         inbrowser=True,
+        allowed_paths=[str(_cache_dir())],
         theme=gr.themes.Soft(primary_hue="orange", neutral_hue="stone"))
     return 0
 

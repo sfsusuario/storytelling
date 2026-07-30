@@ -111,6 +111,25 @@ progressively longer and more ornate toward the top. Each run also produces a
 recommended **social caption + hashtags** (`social.txt`, printed by the CLI
 and shown in the UI) ready to paste into TikTok/Reels.
 
+Each video gets **background sound** matched to its style set, from one of
+two sources (`--music-source`, or the UI dropdown *"Fuente de la música"*):
+
+- **`track` (default)** — open-source music by Kevin MacLeod
+  (incompetech.com, CC BY 4.0): celtic for `pirate`, drums for `military`,
+  bossa for `wealth`… Downloaded once, normalized, looped and mixed; the
+  required CC-BY credit is appended automatically to the social caption.
+  Legal to use, but automated detection may occasionally block a track — if
+  that happens, swap that set's track in `music.py` for another one, or use
+  `synth`.
+- **`synth`** — an ambient bed synthesized locally with ffmpeg. Unique audio
+  that copyright detectors can never flag; also the automatic fallback when
+  the download fails (offline).
+
+Volume: `--music-volume 0.25` (default; 0 disables, also `--no-music`), the
+UI slider *"Música de fondo"*, or `ESCALATE_MUSIC_VOLUME` /
+`ESCALATE_MUSIC_SOURCE` in `.env`. The UI's **🔊 Probar música** button plays
+a sample of exactly what the selected source+set will sound like.
+
 Every scene carries a **watermark** at the bottom-left (`@sfsusers` by
 default). Change it per run with `--watermark "@otro"` (or the UI textbox),
 disable it with `--no-watermark`, or change the default via
@@ -154,7 +173,14 @@ same inputs → same output folder.
 
 ## Style sets
 
-Seven escalation ladders ship in [config.py](src/escalator/config.py):
-`medieval`, `scifi`, `corporate`, `mythology`, `military`, `pirate`, `arcane` —
-each 5 personas, level 1→5, always ascending in sophistication. Adding a new
-set is one dict entry in `STYLE_SETS`; nothing else changes.
+Eleven escalation ladders ship in [config.py](src/escalator/config.py):
+`medieval`, `scifi`, `corporate`, `mythology`, `military`, `pirate`, `arcane`,
+`epochs` (caveman → year 3000), `wealth` (broke student → trillionaire),
+`tech` (intern dev → tech visionary), `anger` (totally chill → apocalyptic
+rage) — each 5 personas, level 1→5, always ascending. Adding a new set is one
+dict entry in `STYLE_SETS`; nothing else changes.
+
+**Content idea**: run an audience loop — ask followers to comment a phrase,
+then generate their video with `escalate imagen.png "frase del comentario"`.
+Each reply becomes a new post, and commenters come back to see if they were
+picked.

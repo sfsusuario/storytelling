@@ -6,10 +6,12 @@ from pathlib import Path
 
 from . import __version__
 from .config import (CURATED_VOICES, DEFAULT_FPS, DEFAULT_HEIGHT,
-                     DEFAULT_IMAGE_MODEL, DEFAULT_LANGUAGE, DEFAULT_STAGES,
-                     DEFAULT_TEXT_MODEL, DEFAULT_VOICE, DEFAULT_VOICE_PITCH,
-                     DEFAULT_VOICE_RATE, DEFAULT_WATERMARK, DEFAULT_WIDTH,
-                     STYLE_SETS, PipelineOptions)
+                     DEFAULT_IMAGE_MODEL, DEFAULT_LANGUAGE,
+                     DEFAULT_MUSIC_SOURCE, DEFAULT_MUSIC_VOLUME,
+                     DEFAULT_STAGES, DEFAULT_TEXT_MODEL,
+                     DEFAULT_VOICE, DEFAULT_VOICE_PITCH, DEFAULT_VOICE_RATE,
+                     DEFAULT_WATERMARK, DEFAULT_WIDTH, STYLE_SETS,
+                     PipelineOptions)
 
 EXIT_USAGE, EXIT_API, EXIT_FFMPEG = 1, 2, 3
 
@@ -60,6 +62,17 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Disable the watermark")
     p.add_argument("--no-subtitles", action="store_true",
                    help="Do not burn narration subtitles into the video")
+    p.add_argument("--music-volume", type=float, default=None,
+                   help="Background music volume 0..0.6 (default "
+                        "ESCALATE_MUSIC_VOLUME or 0.25; 0 = none)")
+    p.add_argument("--no-music", action="store_true",
+                   help="Disable the ambient background sound")
+    p.add_argument("--music-source", choices=["synth", "track"],
+                   default=DEFAULT_MUSIC_SOURCE,
+                   help="synth = synthesized ambience, immune to TikTok/"
+                        "YouTube copyright detection (default); track = "
+                        "CC-BY music from incompetech (may be auto-blocked "
+                        "on some platforms)")
     p.add_argument("--fit", choices=["crop", "blur", "pad"], default="crop",
                    help="How the image fills the phone frame: crop = fill "
                         "TikTok-style (default), blur = blurred background, "
@@ -113,6 +126,10 @@ def options_from_args(args: argparse.Namespace) -> PipelineOptions:
         width=width, height=height, fps=args.fps, fit=args.fit,
         watermark="" if args.no_watermark else args.watermark,
         subtitles=not args.no_subtitles,
+        music_volume=0.0 if args.no_music else (
+            args.music_volume if args.music_volume is not None
+            else DEFAULT_MUSIC_VOLUME),
+        music_source=args.music_source,
         output_dir=Path(args.output_dir) if args.output_dir else None,
         dry_run=args.dry_run,
         test_mode=args.test_mode,

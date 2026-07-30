@@ -47,6 +47,69 @@ DEFAULT_VOICE_RATE = os.environ.get("ESCALATE_VOICE_RATE", "-8%")
 DEFAULT_VOICE_PITCH = os.environ.get("ESCALATE_VOICE_PITCH", "-12Hz")
 DEFAULT_LANGUAGE = os.environ.get("ESCALATE_LANGUAGE", "es")
 DEFAULT_WATERMARK = os.environ.get("ESCALATE_WATERMARK", "@sfsusers")
+DEFAULT_MUSIC_VOLUME = float(os.environ.get("ESCALATE_MUSIC_VOLUME", "0.25"))
+# "synth" = locally synthesized ambience (unique audio, can never be flagged
+# by TikTok/YouTube copyright detection). "track" = CC-BY tracks from
+# incompetech (legal with credit, but automated detectors may still block).
+DEFAULT_MUSIC_SOURCE = os.environ.get("ESCALATE_MUSIC_SOURCE", "track")
+
+# ---------------------------------------------------------------------------
+# Ambient background soundscapes — synthesized with ffmpeg (lavfi), one per
+# style set. No downloads, no licensing: calm drones/chords tuned to each
+# world. Peak levels are similar across sets; the final loudness is governed
+# by music_volume when mixing under the narration.
+# ---------------------------------------------------------------------------
+_STEREO = ",aformat=sample_fmts=fltp:channel_layouts=stereo"
+BACKGROUND_SOUNDS = {
+    # warm D-minor pad, candlelit hall
+    "medieval": "aevalsrc=0.28*sin(2*PI*146.83*t)+0.2*sin(2*PI*220*t)"
+                "+0.16*sin(2*PI*293.66*t)+0.12*sin(2*PI*349.23*t):s=44100"
+                ",lowpass=f=900,tremolo=f=0.13:d=0.35" + _STEREO,
+    # deep ship hum with a slow shimmer
+    "scifi": "aevalsrc=0.3*sin(2*PI*55*t)+0.2*sin(2*PI*110*t)"
+             "+0.12*sin(2*PI*164.81*t)+0.05*sin(2*PI*440*t):s=44100"
+             ",lowpass=f=1200,tremolo=f=0.2:d=0.25" + _STEREO,
+    # soft Cmaj7 office pad
+    "corporate": "aevalsrc=0.24*sin(2*PI*130.81*t)+0.18*sin(2*PI*164.81*t)"
+                 "+0.16*sin(2*PI*196*t)+0.12*sin(2*PI*246.94*t):s=44100"
+                 ",lowpass=f=1000,tremolo=f=0.1:d=0.3" + _STEREO,
+    # ethereal open fifths, slow celestial beat
+    "mythology": "aevalsrc=0.26*sin(2*PI*98*t)+0.2*sin(2*PI*146.83*t)"
+                 "+0.14*sin(2*PI*196*t)+0.1*sin(2*PI*294.5*t):s=44100"
+                 ",lowpass=f=1100,tremolo=f=0.1:d=0.4" + _STEREO,
+    # low steady pulse, distant drums feel
+    "military": "aevalsrc=0.32*sin(2*PI*73.42*t)+0.2*sin(2*PI*110*t)"
+                "+0.08*sin(2*PI*146.83*t):s=44100"
+                ",lowpass=f=700,tremolo=f=0.45:d=0.6" + _STEREO,
+    # ocean waves (filtered brown noise swelling slowly)
+    "pirate": "anoisesrc=color=brown:sample_rate=44100:amplitude=0.7"
+              ",lowpass=f=450,tremolo=f=0.1:d=0.75" + _STEREO,
+    # mysterious detuned pad
+    "arcane": "aevalsrc=0.24*sin(2*PI*110*t)+0.16*sin(2*PI*164.81*t)"
+              "+0.14*sin(2*PI*220.6*t)+0.1*sin(2*PI*246.94*t):s=44100"
+              ",lowpass=f=1200,tremolo=f=0.11:d=0.35" + _STEREO,
+    # neutral cinematic drone
+    "epochs": "aevalsrc=0.26*sin(2*PI*130.81*t)+0.18*sin(2*PI*196*t)"
+              "+0.12*sin(2*PI*261.63*t):s=44100"
+              ",lowpass=f=1000,tremolo=f=0.1:d=0.3" + _STEREO,
+    # smooth Fmaj7 lounge pad
+    "wealth": "aevalsrc=0.24*sin(2*PI*87.31*t)+0.18*sin(2*PI*130.81*t)"
+              "+0.14*sin(2*PI*174.61*t)+0.12*sin(2*PI*220*t):s=44100"
+              ",lowpass=f=900,tremolo=f=0.1:d=0.3" + _STEREO,
+    # clean synth pad with a gentle pulse
+    "tech": "aevalsrc=0.26*sin(2*PI*110*t)+0.16*sin(2*PI*220*t)"
+            "+0.1*sin(2*PI*330*t):s=44100"
+            ",lowpass=f=1400,tremolo=f=0.3:d=0.4" + _STEREO,
+    # tense low drone with a slow dissonant beating
+    "anger": "aevalsrc=0.3*sin(2*PI*82.41*t)+0.22*sin(2*PI*110*t)"
+             "+0.18*sin(2*PI*116.54*t):s=44100"
+             ",lowpass=f=600,tremolo=f=0.1:d=0.3" + _STEREO,
+}
+BACKGROUND_SOUNDS["_default"] = BACKGROUND_SOUNDS["epochs"]
+
+
+def background_graph(style_set: str) -> str:
+    return BACKGROUND_SOUNDS.get(style_set) or BACKGROUND_SOUNDS["_default"]
 
 LANGUAGE_NAMES = {
     "es": "español",
@@ -251,6 +314,128 @@ STYLE_SETS: dict[str, list[Persona]] = {
                 "anchors and figureheads in a grotto of plundered gold, torchlit with "
                 "emerald sea-glow, legendary dark-fantasy seascape art"),
     ],
+    "epochs": [
+        Persona(1, "Caveman",
+                "Primitive caveman speech: broken grammar, very few words, "
+                "grunts and simple demands.",
+                "rough fur pelts and a bone necklace, a firelit cave with wall "
+                "paintings, flickering orange firelight, gritty prehistoric realism"),
+        Persona(2, "Roman Citizen",
+                "Classical orator style: formal, rhetorical, addressing an "
+                "assembly, with a Latin-flavored gravitas.",
+                "a white toga with a red sash, the Roman forum with marble "
+                "columns, bright Mediterranean sunlight, classical painting realism"),
+        Persona(3, "Medieval Scholar",
+                "Learned medieval speech: pious, ornate, referencing scrolls "
+                "and providence.",
+                "dark scholar robes with a hood, a candlelit scriptorium with "
+                "manuscripts and quills, warm candlelight, illuminated-manuscript "
+                "era realism"),
+        Persona(4, "Modern Urbanite",
+                "Polished contemporary speech: articulate, efficient, a touch "
+                "of corporate-casual vocabulary.",
+                "smart-casual blazer over a tee, a neon-lit modern city street "
+                "at dusk, cinematic urban lighting, sharp editorial photography"),
+        Persona(5, "Year 3000 Human",
+                "Transcendent far-future speech: serene, cosmic perspective, "
+                "technology and mind fused, almost oracular.",
+                "a sleek luminous suit with subtle holographic circuitry, an "
+                "orbital city with Earth visible through a vast window, cool "
+                "radiant sci-fi light, pristine futuristic cinematic style"),
+    ],
+    "wealth": [
+        Persona(1, "Broke Student",
+                "Casual broke-student slang: informal, resigned humor about "
+                "having no money.",
+                "a worn hoodie, a tiny messy room with instant noodles and "
+                "hanging laundry, dim lamp light, candid low-budget realism"),
+        Persona(2, "Office Worker",
+                "Modest middle-class politeness: practical, budget-aware, "
+                "unassuming.",
+                "an ironed shirt with a lanyard, a beige office cubicle with a "
+                "commuter mug, flat fluorescent light, everyday office realism"),
+        Persona(3, "Successful Entrepreneur",
+                "Confident startup-founder speech: growth, hustle and "
+                "opportunity vocabulary.",
+                "a fitted blazer over a brand tee, a bright loft office with "
+                "glass walls and a standing desk, airy daylight, modern "
+                "editorial photography"),
+        Persona(4, "Millionaire",
+                "Refined luxury speech: understated power, names comforts "
+                "casually, impeccable manners.",
+                "a tailored suit with a silk pocket square, the deck of a "
+                "yacht at golden hour with a marina behind, warm sunset light, "
+                "luxury magazine photography"),
+        Persona(5, "Trillionaire Magnate",
+                "World-shaping grandiosity: speaks of markets, nations and "
+                "planets as personal assets, serene absolute power.",
+                "an immaculate black bespoke suit with a subtle gold insignia, "
+                "a private orbital penthouse overlooking Earth, dramatic "
+                "starlit rim lighting, opulent sci-fi cinematic style"),
+    ],
+    "tech": [
+        Persona(1, "Intern Developer",
+                "Nervous junior-dev speech: meme-flavored, hedging, afraid of "
+                "breaking production.",
+                "an oversized hoodie and headphones around the neck, a "
+                "cluttered desk with sticker-covered laptop and energy drinks, "
+                "cool monitor glow, candid startup-office realism"),
+        Persona(2, "Senior Developer",
+                "Precise technical speech: calm, exact jargon, speaks in "
+                "systems and edge cases.",
+                "a plain tee and mechanical keyboard, a tidy battlestation "
+                "with triple monitors and code on screen, ambient LED "
+                "backlight, sharp tech-workspace photography"),
+        Persona(3, "Software Architect",
+                "Systems-thinking speech: diagrams in words, tradeoffs, "
+                "diplomatic authority.",
+                "a smart shirt with rolled sleeves, a whiteboard wall full of "
+                "architecture diagrams, bright meeting-room light, clean "
+                "corporate-tech photography"),
+        Persona(4, "CTO",
+                "Strategic executive-tech speech: roadmaps, scale and vision, "
+                "boardroom confidence.",
+                "a sleek blazer with no tie, a glass corner office with a "
+                "city skyline and dashboards on screens, dusk window light, "
+                "premium executive portrait"),
+        Persona(5, "Tech Visionary",
+                "Keynote-prophet speech: sweeping declarations about the "
+                "future of humanity and technology, quotable and messianic.",
+                "a minimalist black turtleneck, a vast keynote stage with a "
+                "glowing product reveal behind, dramatic single-spot stage "
+                "lighting, iconic product-launch photography"),
+    ],
+    "anger": [
+        Persona(1, "Totally Chill",
+                "Completely relaxed speech: unbothered, easygoing, almost "
+                "amused.",
+                "a loose tee and relaxed posture vibe, a cozy sunlit living "
+                "room with plants, soft warm daylight, mellow lifestyle "
+                "photography"),
+        Persona(2, "Mildly Annoyed",
+                "Passive-aggressive politeness: forced calm, pointed word "
+                "choices, a sigh between the lines.",
+                "the same casual clothes slightly tense, a tidy room with one "
+                "thing conspicuously out of place, slightly dimmed light, "
+                "subtle-tension realism"),
+        Persona(3, "Visibly Irritated",
+                "Clipped stern speech: short sentences, warnings, patience "
+                "running out.",
+                "a buttoned jacket, an office with scattered papers and a "
+                "ticking clock, harsh cold side light, dramatic realism"),
+        Persona(4, "Furious",
+                "Thunderous fury: loud declarations, ultimatums, controlled "
+                "explosion.",
+                "a storm-whipped dark coat, a rooftop under a brewing storm "
+                "with wind-blown debris, dramatic red-tinged storm light, "
+                "intense cinematic style"),
+        Persona(5, "Apocalyptic Rage",
+                "Wrath of mythological proportions: speaks like a force of "
+                "nature ending the world over this, biblical imagery.",
+                "a cloak of embers and ash with glowing eyes accent, a "
+                "cracked landscape with fire, lightning and ash rain, "
+                "hellish orange-and-black light, epic apocalyptic concept art"),
+    ],
     "arcane": [
         Persona(1, "Curious Apprentice",
                 "Excitable apprentice chatter. Half-understood terms, wide-eyed wonder.",
@@ -378,6 +563,8 @@ class PipelineOptions:
     fit: str = "crop"                    # crop (TikTok fill) | blur | pad
     watermark: str = DEFAULT_WATERMARK   # bottom-left text; "" disables it
     subtitles: bool = True               # burn narration subtitles into the video
+    music_volume: float = DEFAULT_MUSIC_VOLUME  # 0 disables background sound
+    music_source: str = DEFAULT_MUSIC_SOURCE    # synth | track
     output_dir: Path | None = None       # default derived from input hash
     dry_run: bool = False
     test_mode: bool = False              # skip Gemini images: cheap run (Claude + free TTS only)

@@ -80,7 +80,8 @@ def resolve_text_backend(provider: str, model: str) -> tuple[str, str]:
 def _inputs_key(phrase: str, personas: list[Persona], model: str,
                 language: str) -> str:
     payload = json.dumps(
-        [phrase, model, language, build_rewrite_system_prompt(language)]
+        [phrase, model, language, "social-v2",
+         build_rewrite_system_prompt(language)]
         + [[p.name, p.register] for p in personas],
         ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -149,9 +150,9 @@ def _rewrites_via_gemini(phrase: str, personas: list[Persona],
     return parsed
 
 
-def _format_social(caption: str, hashtags: list[str]) -> str:
+def _format_social(caption: str, hashtags: list[str], phrase: str) -> str:
     tags = " ".join("#" + t.lstrip("#").replace(" ", "") for t in hashtags if t)
-    return f"{caption.strip()}\n\n{tags}".strip()
+    return f'{caption.strip()}\n«{phrase.strip()}»\n\n{tags}'.strip()
 
 
 def generate_rewrites(phrase: str, personas: list[Persona], model: str,
@@ -186,7 +187,7 @@ def generate_rewrites(phrase: str, personas: list[Persona], model: str,
     if personas[0].level <= 1:
         # Level 1 is reality: the exact original phrase, never a rewrite.
         rewrites[0] = phrase.strip()
-    social = _format_social(result.caption, result.hashtags)
+    social = _format_social(result.caption, result.hashtags, phrase)
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     tmp = cache_file.with_suffix(".tmp")
